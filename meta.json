@@ -1,7 +1,7 @@
 {
   "source": "https://heisse-preise.io/data/latest-canonical.json",
   "license": "MIT (badlogic/heissepreise)",
-  "generatedAt": "2026-11-17T08:01:17.830Z",
+  "generatedAt": "2026-11-17T08:09:13.142Z",
   "total": 69,
   "bySupermarket": {
     "BILLA": 23,
