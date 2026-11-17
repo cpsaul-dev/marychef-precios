@@ -1,0 +1,11 @@
+{
+  "source": "https://heisse-preise.io/data/latest-canonical.json",
+  "license": "MIT (badlogic/heissepreise)",
+  "generatedAt": "2026-11-17T07:58:27.011Z",
+  "total": 69,
+  "bySupermarket": {
+    "BILLA": 23,
+    "HOFER": 23,
+    "SPAR": 23
+  }
+}
