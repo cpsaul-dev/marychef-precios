@@ -1,7 +1,7 @@
 {
   "source": "https://heisse-preise.io/data/latest-canonical.json",
   "license": "MIT (badlogic/heissepreise)",
-  "generatedAt": "2026-11-19T12:39:36.377Z",
+  "generatedAt": "2026-11-20T12:39:02.519Z",
   "columns": [
     "id",
     "name",
