@@ -3,19 +3,37 @@ on:
   schedule:
     - cron: "0 4 * * *"
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Only download and print, do not commit"
+        type: boolean
+        default: false
+  push:
+    branches-ignore: [main]
+    paths: ["scripts/**", ".github/workflows/update-prices.yml"]
 permissions:
   contents: write
+concurrency:
+  group: update-prices-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-      - run: node scripts/filter-austrian-prices.js
+      - name: Offline tests
+        run: node --test scripts/test/*.test.js
+      - name: Download and publish
+        env:
+          # Branch pushes only test the download against the live sources; only main publishes.
+          DRY_RUN: ${{ (github.event_name == 'push' || inputs.dry_run) && '1' || '0' }}
+        run: node scripts/filter-austrian-prices.js
       - name: Commit if changed
+        if: github.ref == 'refs/heads/main' && github.event_name != 'push' && !inputs.dry_run
         run: |
           if [ -n "$(git status --porcelain data)" ]; then
             git config user.name "github-actions[bot]"
