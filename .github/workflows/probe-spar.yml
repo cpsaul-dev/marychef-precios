@@ -1,0 +1,16 @@
+# Temporary: only on this branch, removed before merging.
+name: Probe SPAR
+on:
+  push:
+    branches: [claude/project-thread-tw1v0b]
+    paths: ["scripts/probe/**", ".github/workflows/probe-spar.yml"]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: node scripts/probe/probe-spar.js
