@@ -29,7 +29,7 @@ function readJson(file) {
  * Decides, per store, what goes into meta.json. A fresh valid result is written; otherwise the
  * previous file is kept while it is younger than maxAgeDays, so one bad day never empties a store.
  */
-function publishStores(outDir, results, { now = Date.now(), maxAgeDays = 14 } = {}) {
+function publishStores(outDir, results, { now = Date.now(), maxAgeDays = 14, keepOthers = false } = {}) {
   const previous = readJson(path.join(outDir, "meta.json")) || {};
   const prevStores = previous.stores || {};
   const stores = {};
@@ -50,6 +50,19 @@ function publishStores(outDir, results, { now = Date.now(), maxAgeDays = 14 } = 
       console.warn(`${id}: ${problem}; keeping the file from ${prev.updatedAt}`);
     } else {
       console.warn(`${id}: ${problem}; nothing recent to keep, left out of meta.json`);
+    }
+  }
+  // A run that only refreshes some stores (SPAR from a Mac) keeps the others as they were.
+  if (keepOthers) {
+    for (const [id, prev] of Object.entries(prevStores)) {
+      if (id in results || id in stores) continue;
+      const ageDays = (now - Date.parse(prev.updatedAt)) / 864e5;
+      if (fs.existsSync(path.join(outDir, `${id.toLowerCase()}.json`)) && ageDays <= maxAgeDays) stores[id] = prev;
+    }
+    if (!previous.stores && previous.bySupermarket) {
+      for (const [id, count] of Object.entries(previous.bySupermarket)) {
+        if (!(id in stores) && fs.existsSync(path.join(outDir, `${id.toLowerCase()}.json`))) stores[id] = { count, updatedAt: previous.generatedAt, source: previous.source };
+      }
     }
   }
   const bySupermarket = Object.fromEntries(Object.entries(stores).map(([id, s]) => [id, s.count]));
