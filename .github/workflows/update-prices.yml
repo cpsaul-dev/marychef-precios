@@ -31,6 +31,8 @@ jobs:
         env:
           # Branch pushes only test the download against the live sources; only main publishes.
           DRY_RUN: ${{ (github.event_name == 'push' || inputs.dry_run) && '1' || '0' }}
+          # Branch pushes also try the direct BILLA fallback, so it is tested before it is needed.
+          BILLA_DIRECT: ${{ github.event_name == 'push' && '1' || '0' }}
         run: node scripts/filter-austrian-prices.js
       - name: Commit if changed
         if: github.ref == 'refs/heads/main' && github.event_name != 'push' && !inputs.dry_run

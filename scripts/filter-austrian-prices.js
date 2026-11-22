@@ -3,13 +3,15 @@
 // Writes one compact file per supermarket: data/<store>.json, plus data/meta.json.
 // Each row: [id, name, price, unit, quantity, bio(0/1), weighted(0/1), category]
 //  - Stores come from heisse-preise (MIT) while it still updates them (today only BILLA).
+//  - BILLA falls back to the public shop.billa.at API when heisse-preise fails (lib/billa.js).
 //  - SPAR: heisse-preise stopped in Sept 2026. Its old public search is gone and spar.at now loads
 //    prices from a private API that needs a token issued to the web page, so it is not read here.
 //  - HOFER has no online food shop since 30 June 2026, so there is nothing to read.
 // Each store is independent: if one fails, the others are still published and the failed one keeps
 // its last good file (see lib/publish.js).
 const path = require("node:path");
-const { publishStores } = require("./lib/publish");
+const { publishStores, problemWith } = require("./lib/publish");
+const billa = require("./lib/billa");
 
 const SOURCE_URL = process.env.HEISSE_PREISE_URL || "https://heisse-preise.io/data/latest-canonical.json";
 const OUT_DIR = process.env.OUT_DIR || path.resolve(__dirname, "..", "data");
@@ -80,6 +82,20 @@ async function main() {
   } catch (e) {
     console.warn(`heisse-preise failed: ${e.message}`);
     for (const id of Object.values(HP_STORES)) results[id] = { error: "heisse-preise download failed", minRows: MIN_ROWS[id] };
+  }
+
+  // BILLA fallback: read shop.billa.at directly when heisse-preise is down, stale or looks wrong.
+  const b = results.BILLA;
+  const billaProblem = b.rows ? problemWith(b.rows, b) : b.error;
+  if (billaProblem || process.env.BILLA_DIRECT === "1") {
+    console.warn(`BILLA from heisse-preise: ${billaProblem || "ok, but BILLA_DIRECT=1"}; reading shop.billa.at`);
+    try {
+      const rows = (await billa.fetchRows()).filter(isFood);
+      results.BILLA = { rows, minRows: MIN_ROWS.BILLA, source: "https://shop.billa.at/api/product-discovery" };
+    } catch (e) {
+      console.warn(`shop.billa.at failed: ${e.message}`);
+      if (billaProblem) results.BILLA = { error: `${billaProblem}; shop.billa.at: ${e.message}`, minRows: MIN_ROWS.BILLA };
+    }
   }
 
   if (process.env.DRY_RUN === "1") {

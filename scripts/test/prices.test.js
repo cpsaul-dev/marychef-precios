@@ -7,6 +7,28 @@ const os = require("node:os");
 const path = require("node:path");
 const { problemWith, publishStores } = require("../lib/publish");
 const { isFood } = require("../filter-austrian-prices");
+const billa = require("../lib/billa");
+const { getJson } = require("../lib/http");
+
+test("BILLA API products become rows like heisse-preise", () => {
+  const item = { sku: "00-18500", name: "Milka Nikolo Alpenmilch", amount: "180", volumeLabelShort: "g", badges: ["eg-neu"], weightArticle: false,
+    price: { baseUnitShort: "g", regular: { value: 469 } } };
+  assert.deepEqual(billa.toRow(item, "58"), ["00-18500", "Milka Nikolo Alpenmilch", 4.69, "g", 180, 0, 0, "58"]);
+  assert.deepEqual(billa.toRow({ ...item, amount: "1", volumeLabelShort: "l", badges: ["pp-bio"] }, "34").slice(3, 6), ["ml", 1000, 1]);
+  assert.equal(billa.toRow({ ...item, price: { regular: { value: 0 } } }, "58"), null);
+  assert.equal(billa.toRow({ ...item, volumeLabelShort: "wg" }, "58"), null);
+});
+
+test("retries 5xx and gives up on 4xx", async () => {
+  let calls = 0;
+  const flaky = async () => (++calls < 3 ? { ok: false, status: 503 } : { ok: true, status: 200, json: async () => ({ ok: 1 }) });
+  assert.deepEqual(await getJson("u", { fetchImpl: flaky, backoffMs: 1 }), { ok: 1 });
+  assert.equal(calls, 3);
+  calls = 0;
+  const forbidden = async () => (calls++, { ok: false, status: 403 });
+  await assert.rejects(getJson("u", { fetchImpl: forbidden, backoffMs: 1 }), /403/);
+  assert.equal(calls, 1);
+});
 
 test("food filter drops drinks and cleaning products", () => {
   assert.ok(isFood(["1", "Vollmilch", 1, "ml", 1000, 0, 0, "34"]));

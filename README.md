@@ -4,6 +4,7 @@ Data-only repo: a filtered daily snapshot of Austrian supermarket food prices fo
 
 ## Sources
 - [heisse-preise](https://github.com/badlogic/heissepreise) (MIT), `https://heisse-preise.io/data/latest-canonical.json`. A store is only used while heisse-preise updated it in the last 45 days. Today that is only **BILLA**.
+- **BILLA fallback**: when heisse-preise fails or looks wrong for BILLA, the public JSON API of shop.billa.at (`/api/product-discovery`, no token; robots.txt allows it) is read directly, food categories only, one request per second. Parsing and category codes follow heisse-preise.
 - **SPAR**: heisse-preise stopped on 2026-09-27. SPAR's old public search channel is gone, and spar.at's Produktwelt now loads prices from a private API that needs a token issued to the web page (and spar.at answers 403 to GitHub's servers). It is not read here on purpose.
 - **HOFER**: Hofer closed its online food shop on 30 June 2026; hofer.at only sells non-food online.
 - **LIDL**: not in any source.
