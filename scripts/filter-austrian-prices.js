@@ -2,20 +2,20 @@
 "use strict";
 // Writes one compact file per supermarket: data/<store>.json, plus data/meta.json.
 // Each row: [id, name, price, unit, quantity, bio(0/1), weighted(0/1), category]
-//  - BILLA (and any other store heisse-preise still updates) comes from heisse-preise (MIT).
-//  - SPAR comes straight from the SPAR product search, because heisse-preise stopped updating it.
+//  - Stores come from heisse-preise (MIT) while it still updates them (today only BILLA).
+//  - SPAR: heisse-preise stopped in Sept 2026. Its old public search is gone and spar.at now loads
+//    prices from a private API that needs a token issued to the web page, so it is not read here.
 //  - HOFER has no online food shop since 30 June 2026, so there is nothing to read.
 // Each store is independent: if one fails, the others are still published and the failed one keeps
 // its last good file (see lib/publish.js).
 const path = require("node:path");
-const spar = require("./lib/spar");
 const { publishStores } = require("./lib/publish");
 
 const SOURCE_URL = process.env.HEISSE_PREISE_URL || "https://heisse-preise.io/data/latest-canonical.json";
 const OUT_DIR = process.env.OUT_DIR || path.resolve(__dirname, "..", "data");
-const HP_STORES = { billa: "BILLA", mpreis: "MPREIS", unimarkt: "UNIMARKT" };
+const HP_STORES = { billa: "BILLA", spar: "SPAR", hofer: "HOFER", mpreis: "MPREIS", unimarkt: "UNIMARKT" };
 const MAX_AGE_DAYS = Number(process.env.MAX_AGE_DAYS || 45);
-const MIN_ROWS = { BILLA: 1000, SPAR: 1000, MPREIS: 500, UNIMARKT: 500 };
+const MIN_ROWS = { BILLA: 1000, SPAR: 1000, HOFER: 500, MPREIS: 500, UNIMARKT: 500 };
 
 // heisse-preise category codes to drop: non-food, pets, baby, alcohol (except wine 25), drinks, desserts, prepared dishes.
 const CATEGORY_DROP = new Set(["20","21","22","23","24","26","27","29","33","37","43","42","44","45","46","47","48","5E","5F",
@@ -28,7 +28,18 @@ function isFood(row) {
 }
 
 async function fromHeissePreise() {
-  const res = await fetch(SOURCE_URL, { signal: AbortSignal.timeout(180_000) });
+  let res;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      res = await fetch(SOURCE_URL, { signal: AbortSignal.timeout(180_000) });
+      if (res.ok || (res.status < 500 && res.status !== 429) || attempt === 3) break;
+      console.warn(`heisse-preise: HTTP ${res.status}, retrying`);
+    } catch (e) {
+      if (attempt === 3) throw e;
+      console.warn(`heisse-preise: ${e.message}, retrying`);
+    }
+    await new Promise((r) => setTimeout(r, 10_000 * attempt));
+  }
   if (!res.ok) throw new Error(`HTTP ${res.status} from ${SOURCE_URL}`);
   const items = await res.json();
   if (!Array.isArray(items)) throw new Error("Unexpected heisse-preise payload (not an array)");
@@ -62,38 +73,14 @@ async function fromHeissePreise() {
   return out;
 }
 
-async function fromSpar() {
-  const hits = await spar.fetchCatalog();
-  if (process.env.DRY_RUN === "1" && hits[0]) console.log("[dry run] SPAR sample hit:", JSON.stringify(hits[0]).slice(0, 3000));
-  const rows = [];
-  const seen = new Set();
-  let unparsed = 0;
-  for (const hit of hits) {
-    const row = spar.toRow(hit);
-    if (!row) {
-      unparsed++;
-      continue;
-    }
-    if (seen.has(row[0]) || !isFood(row)) continue;
-    seen.add(row[0]);
-    rows.push(row);
-  }
-  console.log(`SPAR: ${hits.length} hits, ${unparsed} not parsable, ${rows.length} food rows`);
-  return rows;
-}
-
 async function main() {
   const results = {};
-  const [hp, sp] = await Promise.allSettled([fromHeissePreise(), fromSpar()]);
-  if (hp.status === "fulfilled") {
-    for (const [id, r] of Object.entries(hp.value)) results[id] = { ...r, minRows: MIN_ROWS[id], source: SOURCE_URL };
-  } else {
-    console.warn(`heisse-preise failed: ${hp.reason?.message || hp.reason}`);
+  try {
+    for (const [id, r] of Object.entries(await fromHeissePreise())) results[id] = { ...r, minRows: MIN_ROWS[id], source: SOURCE_URL };
+  } catch (e) {
+    console.warn(`heisse-preise failed: ${e.message}`);
     for (const id of Object.values(HP_STORES)) results[id] = { error: "heisse-preise download failed", minRows: MIN_ROWS[id] };
   }
-  results.SPAR = sp.status === "fulfilled"
-    ? { rows: sp.value, minRows: MIN_ROWS.SPAR, source: "search-spar.spar-ics.com (products_lmos_at)" }
-    : { error: `SPAR download failed: ${sp.reason?.message || sp.reason}`, minRows: MIN_ROWS.SPAR };
 
   if (process.env.DRY_RUN === "1") {
     for (const [id, r] of Object.entries(results)) console.log(`[dry run] ${id}:`, r.rows ? `${r.rows.length} rows, e.g. ${JSON.stringify(r.rows.slice(0, 3))}` : r.error);

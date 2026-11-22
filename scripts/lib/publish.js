@@ -55,7 +55,7 @@ function publishStores(outDir, results, { now = Date.now(), maxAgeDays = 14 } = 
   const bySupermarket = Object.fromEntries(Object.entries(stores).map(([id, s]) => [id, s.count]));
   const total = Object.values(bySupermarket).reduce((a, b) => a + b, 0);
   const meta = {
-    source: "heisse-preise (BILLA) and the SPAR product search; see README",
+    source: "https://heisse-preise.io/data/latest-canonical.json",
     license: "MIT (badlogic/heissepreise) for the heisse-preise data and parsing",
     generatedAt: new Date(now).toISOString(),
     columns: ["id", "name", "priceEur", "unit", "quantity", "bio", "weighted", "category"],

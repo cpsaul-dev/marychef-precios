@@ -3,10 +3,11 @@
 Data-only repo: a filtered daily snapshot of Austrian supermarket food prices for the MaryChef app.
 
 ## Sources
-- **BILLA** (and MPREIS / Unimarkt if they become fresh again): [heisse-preise](https://github.com/badlogic/heissepreise) (MIT), `https://heisse-preise.io/data/latest-canonical.json`. A store is only used while heisse-preise updated it in the last 45 days.
-- **SPAR**: the public product search that interspar.at uses (`search-spar.spar-ics.com`, FactFinder `products_lmos_at`). heisse-preise stopped updating SPAR, so it is read directly, once a day, in one request (or small pages with a pause if that fails), with an identifying User-Agent. robots.txt of spar.at and interspar.at does not disallow it. Parsing and the category map (`scripts/lib/spar-categories.json`) come from heisse-preise (MIT).
-- **HOFER**: not available. Hofer closed its online food shop on 30 June 2026; hofer.at only sells non-food online.
+- [heisse-preise](https://github.com/badlogic/heissepreise) (MIT), `https://heisse-preise.io/data/latest-canonical.json`. A store is only used while heisse-preise updated it in the last 45 days. Today that is only **BILLA**.
+- **SPAR**: heisse-preise stopped on 2026-09-27. SPAR's old public search channel is gone, and spar.at's Produktwelt now loads prices from a private API that needs a token issued to the web page (and spar.at answers 403 to GitHub's servers). It is not read here on purpose.
+- **HOFER**: Hofer closed its online food shop on 30 June 2026; hofer.at only sells non-food online.
 - **LIDL**: not in any source.
+- Only food is kept (drinks, drugstore, household, pets and ready meals are dropped).
 
 ## Files
 - `data/<store>.json`: one compact file per supermarket, rows `[id, name, priceEur, unit (g|ml|stk), quantity, bio, weighted, category]`. Food only.
@@ -21,6 +22,6 @@ Data-only repo: a filtered daily snapshot of Austrian supermarket food prices fo
 ## Running
 - `node --test scripts/test/*.test.js`: offline tests.
 - `DRY_RUN=1 node scripts/filter-austrian-prices.js`: download and print, write nothing.
-- The workflow publishes daily from `main`; a push to any other branch runs the tests and a dry run against the live sources.
+- The workflow publishes daily from `main`; a push to any other branch runs the tests and a dry run.
 
 No app code, no personal data.
