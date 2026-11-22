@@ -79,3 +79,62 @@ test("old meta.json without per-store info still counts as previous data", () =>
   const meta = publishStores(dir, { BILLA: { error: "down", minRows: 5 }, SPAR: { rows: rows(7, "s"), minRows: 5 } }, { now: t0 + 864e5 });
   assert.deepEqual(meta.bySupermarket, { BILLA: 6, SPAR: 7 });
 });
+
+const spar = require("../lib/spar");
+
+/** A product page as spar.at serves it: a flat Nuxt payload where every value is an index. */
+function sparPage({ id = "1456905", path = "lebensmittel|milchprodukte-alternativen|kaese-streichkaese-frischkaese|schnittkaese", unit = "KG", amount = "0,250", statt = null, base = 3.99 } = {}) {
+  const arr = [];
+  const put = (v) => arr.push(v) - 1;
+  const obj = (o) => {
+    const i = put(null);
+    arr[i] = Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v && typeof v === "object" && "ref" in v ? v.ref : put(v)]));
+    return i;
+  };
+  const ref = (i) => ({ ref: i });
+  put(["ShallowReactive", 1]);
+  const root = put(null);
+  const reactive = put(null);
+  const val = (v) => obj({ valueString: v });
+  const attrs = obj({
+    amount: ref(obj({ values: ref(put([val(amount)])) })),
+    unit: ref(obj({ values: ref(put([val(unit)])) })),
+    organic: ref(obj({ values: ref(put([obj({ valueBoolean: false })])) })),
+  });
+  const product = obj({ name1: "Woerle", name2: "Gouda mild-fein", pwCategoryPathIDs: path, classificationStoreAttribute: ref(attrs) });
+  const price = obj({ basePrice: base, calculatedPrice: base, stattPrice: statt });
+  const data = obj({ [`pdp-${id}`]: ref(product), [`pdp-price-${id}-8999`]: ref(price) });
+  arr[reactive] = ["ShallowReactive", data];
+  arr[root] = { data: reactive };
+  return `<html><script type="application/json" id="__NUXT_DATA__" data-ssr="true">${JSON.stringify(arr)}</script></html>`;
+}
+
+test("SPAR product page becomes a row", () => {
+  assert.deepEqual(spar.rowFromPage(sparPage()), ["1456905", "Woerle Gouda mild-fein", 3.99, "g", 250, 0, 0, "32"]);
+  assert.equal(spar.rowFromPage(sparPage({ statt: 4.49, base: 3.49 }))[2], 4.49, "regular price, not the promotion");
+  assert.deepEqual(spar.rowFromPage(sparPage({ unit: "L", amount: "1" })).slice(3, 5), ["ml", 1000]);
+});
+
+test("SPAR non-food and ready meals are dropped", () => {
+  assert.equal(spar.rowFromPage(sparPage({ path: "drogerie-beauty|koerper-gesicht|fusspflege|fusspflaster-tinkturen" })), null);
+  assert.equal(spar.rowFromPage(sparPage({ path: "drogerie-beauty|gesundheit|nahrungsergaenzung|protein-sportnahrung" })), null);
+  assert.equal(spar.rowFromPage(sparPage({ path: "lebensmittel|schnelle-kueche-to-go|fertiggerichte|fertigmahlzeiten" })), null);
+  assert.equal(spar.rowFromPage(sparPage({ path: "getraenke|alkoholfreie-getraenke|limonaden|cola" })), null);
+  assert.equal(spar.categoryCode("lebensmittel|beilagen-essig-oel-gewuerze|beilagen|nudeln-teigwaren"), "54");
+  assert.equal(spar.categoryCode("lebensmittel|beilagen-essig-oel-gewuerze|essig-oel|speiseoel"), "5C");
+});
+
+test("only SPAR URLs with an ingredient word are read", () => {
+  const xml = ["woerle-gouda-mild-fein-p1456905", "hp-druckerpatrone-304-schwarz-p2020001353613", "spar-vollmilch-3-5-p1234567"]
+    .map((s) => `<url><loc>https://www.spar.at/produktwelt/${s}</loc></url>`).join("");
+  assert.deepEqual(spar.candidateUrls(xml).map((u) => u.split("/").pop()), ["woerle-gouda-mild-fein-p1456905", "spar-vollmilch-3-5-p1234567"]);
+});
+
+test("a SPAR-only run keeps BILLA as it was", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "precios-"));
+  const t0 = Date.parse("2026-11-22T04:00:00Z");
+  publishStores(dir, { BILLA: { rows: rows(10), minRows: 5 } }, { now: t0 });
+  const meta = publishStores(dir, { SPAR: { rows: rows(6, "s"), minRows: 5 } }, { now: t0 + 3600e3, keepOthers: true });
+  assert.deepEqual(meta.bySupermarket, { SPAR: 6, BILLA: 10 });
+  assert.equal(meta.stores.BILLA.updatedAt, new Date(t0).toISOString());
+});

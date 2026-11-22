@@ -1,6 +1,7 @@
 "use strict";
 // SPAR from its public Produktwelt pages (spar.at/produktwelt). robots.txt allows them; no token,
 // no private API. Only pages whose name looks like a MaryChef ingredient are read, one per second.
+// Only the HTML is downloaded (compressed, about 43 KB a page): no images, scripts or styles.
 // spar.at answers 403 to GitHub's servers, so this runs on a normal connection (see README).
 
 const BASE = "https://www.spar.at";
@@ -53,7 +54,7 @@ async function getText(url, { retries = 3, timeoutMs = 60_000, fetchImpl = fetch
   for (let attempt = 0; attempt <= retries; attempt++) {
     if (attempt > 0) await sleep(backoffMs * 3 ** (attempt - 1));
     try {
-      const res = await fetchImpl(url, { headers: { "user-agent": USER_AGENT, "accept-language": "de-AT,de;q=0.9" }, signal: AbortSignal.timeout(timeoutMs) });
+      const res = await fetchImpl(url, { headers: { "user-agent": USER_AGENT, "accept-language": "de-AT,de;q=0.9", "accept-encoding": "gzip, br", accept: "text/html" }, signal: AbortSignal.timeout(timeoutMs) });
       if (res.status === 429 || res.status >= 500) throw new Error(`HTTP ${res.status}`);
       if (!res.ok) {
         const e = new Error(`HTTP ${res.status}`);
