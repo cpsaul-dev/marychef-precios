@@ -4,8 +4,8 @@
 // Each row: [id, name, price, unit, quantity, bio(0/1), weighted(0/1), category]
 //  - Stores come from heisse-preise (MIT) while it still updates them (today only BILLA).
 //  - BILLA falls back to the public shop.billa.at API when heisse-preise fails (lib/billa.js).
-//  - SPAR: heisse-preise stopped in Sept 2026. Its old public search is gone and spar.at now loads
-//    prices from a private API that needs a token issued to the web page, so it is not read here.
+//  - SPAR: heisse-preise stopped in Sept 2026 and spar.at is not read here. data/spar.json comes from
+//    a SPAR CSV export (import-spar-csv.js); this run keeps that file for up to 14 days.
 //  - HOFER has no online food shop since 30 June 2026, so there is nothing to read.
 // Each store is independent: if one fails, the others are still published and the failed one keeps
 // its last good file (see lib/publish.js).

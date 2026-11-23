@@ -1,7 +1,7 @@
 {
   "source": "https://heisse-preise.io/data/latest-canonical.json",
-  "license": "MIT (badlogic/heissepreise)",
-  "generatedAt": "2026-11-22T12:23:33.419Z",
+  "license": "MIT (badlogic/heissepreise) for the heisse-preise data and parsing",
+  "generatedAt": "2026-11-23T00:17:07.545Z",
   "columns": [
     "id",
     "name",
@@ -12,8 +12,21 @@
     "weighted",
     "category"
   ],
-  "total": 6006,
+  "total": 6877,
   "bySupermarket": {
+    "SPAR": 871,
     "BILLA": 6006
+  },
+  "stores": {
+    "SPAR": {
+      "count": 871,
+      "updatedAt": "2026-11-23T00:17:07.545Z",
+      "source": "SPAR price export precios-spar-2026-11-23.csv"
+    },
+    "BILLA": {
+      "count": 6006,
+      "updatedAt": "2026-11-22T12:23:33.419Z",
+      "source": "https://heisse-preise.io/data/latest-canonical.json"
+    }
   }
 }

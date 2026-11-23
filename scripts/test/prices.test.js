@@ -80,54 +80,67 @@ test("old meta.json without per-store info still counts as previous data", () =>
   assert.deepEqual(meta.bySupermarket, { BILLA: 6, SPAR: 7 });
 });
 
-const spar = require("../lib/spar");
+const sparCsv = require("../import-spar-csv");
+const { foodRule } = require("../lib/foods");
 
-/** A product page as spar.at serves it: a flat Nuxt payload where every value is an index. */
-function sparPage({ id = "1456905", path = "lebensmittel|milchprodukte-alternativen|kaese-streichkaese-frischkaese|schnittkaese", unit = "KG", amount = "0,250", statt = null, base = 3.99 } = {}) {
-  const arr = [];
-  const put = (v) => arr.push(v) - 1;
-  const obj = (o) => {
-    const i = put(null);
-    arr[i] = Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v && typeof v === "object" && "ref" in v ? v.ref : put(v)]));
-    return i;
-  };
-  const ref = (i) => ({ ref: i });
-  put(["ShallowReactive", 1]);
-  const root = put(null);
-  const reactive = put(null);
-  const val = (v) => obj({ valueString: v });
-  const attrs = obj({
-    amount: ref(obj({ values: ref(put([val(amount)])) })),
-    unit: ref(obj({ values: ref(put([val(unit)])) })),
-    organic: ref(obj({ values: ref(put([obj({ valueBoolean: false })])) })),
+const CSV_HEADER = "\uFEFFfecha,mercado,productId,nombre,cantidad,precio,oferta,disponible,precio_comparacion,unidad_comparacion";
+const csv = (...lines) => [CSV_HEADER, ...lines].join("\n");
+
+test("the app's ingredient rules are read as the app reads them", () => {
+  assert.equal(foodRule("Woerle Gouda mild-fein", "g").food, "cheese");
+  assert.equal(foodRule("SPAR Vollmilch 3,5%", "ml").food, "milk");
+  assert.equal(foodRule("SPAR Kokosmilch", "ml"), null, "excluded word");
+  assert.equal(foodRule("SPAR Vollmilch", "g"), null, "milk is sold by volume");
+});
+
+test("SPAR CSV rows become rows like the other stores", () => {
+  const { rows } = sparCsv.convert(csv(
+    "2026-11-23,8999,1,S-BUDGET Kartoffeln,2 KG,2.99,false,false,1.5,kg",
+    '2026-11-23,8999,2,"SPAR Natur*pur Bio-Schlagobers 36% Fett","0,25 L",1.99,false,false,7.96,L',
+    "2026-11-23,8999,3,SPAR Natur*pur Bio-Eier Gewichtsklasse L 10 Stück,10 STK,4.99,false,false,0.5,Stk.",
+    "2026-11-23,8999,4,Kotányi Pfeffer schwarz gemahlen 42g,,3.99,false,false,,",
+  ));
+  assert.deepEqual(rows, [
+    ["1", "S-BUDGET Kartoffeln", 2.99, "g", 2000, 0, 0, "00"],
+    ["2", "SPAR Natur*pur Bio-Schlagobers 36% Fett", 1.99, "ml", 250, 1, 0, "34"],
+    ["3", "SPAR Natur*pur Bio-Eier Gewichtsklasse L 10 Stück", 4.99, "stk", 10, 1, 0, "30"],
+  ]);
+});
+
+test("SPAR's price per kg sets the pack size when the two disagree", () => {
+  // The deli counter shows "1 KG" with the price of 100 g; cans are priced by drained weight.
+  const { rows, adjusted } = sparCsv.convert(csv(
+    "2026-11-23,8999,1,TANN Bauernschinken,1 KG,1.69,false,false,16.9,kg",
+    "2026-11-23,8999,2,SPAR Natur*pur Bio-Tomaten geschält,400 G,0.75,false,false,3.13,kg",
+  ));
+  assert.deepEqual(rows.map((r) => r[4]), [100, 239.617]);
+  assert.equal(adjusted, 2);
+});
+
+test("SPAR CSV keeps only the app's ingredients at their regular price", () => {
+  const { rows, dropped } = sparCsv.convert(csv(
+    "2026-11-23,8999,1,SPAR Vollmilch,1 L,1.49,true,false,1.49,L",
+    "2026-11-23,8999,2,SPAR enjoy Halbbaguette mit Schinken & Käse,220 G,2.99,false,false,13.59,kg",
+    "2026-11-23,8999,3,Nussyy Bio Fruchtriegel Banane Mandel,40 G,1.29,false,false,32.25,kg",
+    "2026-11-23,8999,4,SPAR Veggie veganes Faschiertes,275 G,4.99,false,false,18.15,kg",
+    "2026-11-23,8999,5,SPAR Glasreiniger,500 ML,1.99,false,false,3.98,L",
+    "2026-11-23,8999,6,SPAR Cola,1 L,1.29,false,false,1.29,L",
+    "2026-11-23,8999,7,INTERSPAR Restaurant Schnitzelbox,,38.99,false,false,,",
+    "2026-11-23,8999,8,S-BUDGET Leberkäse per Packung,300 G,2.49,false,false,8.3,kg",
+  ));
+  assert.deepEqual(rows, []);
+  assert.deepEqual(dropped, {
+    "promotion price, not the regular one": 1,
+    "not food, or a prepared dish": 2,
+    "the ingredient is only a flavour or part of the name": 2,
+    "plant-based version of the ingredient": 1,
+    "not one of the app's ingredients": 1,
+    "no pack size": 1,
   });
-  const product = obj({ name1: "Woerle", name2: "Gouda mild-fein", pwCategoryPathIDs: path, classificationStoreAttribute: ref(attrs) });
-  const price = obj({ basePrice: base, calculatedPrice: base, stattPrice: statt });
-  const data = obj({ [`pdp-${id}`]: ref(product), [`pdp-price-${id}-8999`]: ref(price) });
-  arr[reactive] = ["ShallowReactive", data];
-  arr[root] = { data: reactive };
-  return `<html><script type="application/json" id="__NUXT_DATA__" data-ssr="true">${JSON.stringify(arr)}</script></html>`;
-}
-
-test("SPAR product page becomes a row", () => {
-  assert.deepEqual(spar.rowFromPage(sparPage()), ["1456905", "Woerle Gouda mild-fein", 3.99, "g", 250, 0, 0, "32"]);
-  assert.equal(spar.rowFromPage(sparPage({ statt: 4.49, base: 3.49 }))[2], 4.49, "regular price, not the promotion");
-  assert.deepEqual(spar.rowFromPage(sparPage({ unit: "L", amount: "1" })).slice(3, 5), ["ml", 1000]);
 });
 
-test("SPAR non-food and ready meals are dropped", () => {
-  assert.equal(spar.rowFromPage(sparPage({ path: "drogerie-beauty|koerper-gesicht|fusspflege|fusspflaster-tinkturen" })), null);
-  assert.equal(spar.rowFromPage(sparPage({ path: "drogerie-beauty|gesundheit|nahrungsergaenzung|protein-sportnahrung" })), null);
-  assert.equal(spar.rowFromPage(sparPage({ path: "lebensmittel|schnelle-kueche-to-go|fertiggerichte|fertigmahlzeiten" })), null);
-  assert.equal(spar.rowFromPage(sparPage({ path: "getraenke|alkoholfreie-getraenke|limonaden|cola" })), null);
-  assert.equal(spar.categoryCode("lebensmittel|beilagen-essig-oel-gewuerze|beilagen|nudeln-teigwaren"), "54");
-  assert.equal(spar.categoryCode("lebensmittel|beilagen-essig-oel-gewuerze|essig-oel|speiseoel"), "5C");
-});
-
-test("only SPAR URLs with an ingredient word are read", () => {
-  const xml = ["woerle-gouda-mild-fein-p1456905", "hp-druckerpatrone-304-schwarz-p2020001353613", "spar-vollmilch-3-5-p1234567"]
-    .map((s) => `<url><loc>https://www.spar.at/produktwelt/${s}</loc></url>`).join("");
-  assert.deepEqual(spar.candidateUrls(xml).map((u) => u.split("/").pop()), ["woerle-gouda-mild-fein-p1456905", "spar-vollmilch-3-5-p1234567"]);
+test("a SPAR CSV without the expected columns is refused", () => {
+  assert.throws(() => sparCsv.convert("id,name,price\n1,Milch,1.49"), /missing columns: fecha/);
 });
 
 test("a SPAR-only run keeps BILLA as it was", () => {
