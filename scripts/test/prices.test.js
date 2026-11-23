@@ -93,6 +93,19 @@ test("the app's ingredient rules are read as the app reads them", () => {
   assert.equal(foodRule("SPAR Vollmilch", "g"), null, "milk is sold by volume");
 });
 
+test("the Austrian names of the foods added in the app's #133 are matched too", () => {
+  assert.equal(foodRule("SPAR Karfiol", "stk").food, "cauliflower");
+  assert.equal(foodRule("SPAR Natur*pur Bio-Topfen 20%", "g").food, "quark");
+  assert.equal(foodRule("SPAR Hokkaido-Kürbis", "g").food, "pumpkin");
+  assert.equal(foodRule("SPAR Lauch", "g").food, "leek");
+  assert.equal(foodRule("SPAR Putenschnitzel", "g").food, "turkey");
+  assert.equal(foodRule("SPAR Fisolen", "g").food, "green_beans");
+  assert.equal(foodRule("SPAR Zucchini", "g").food, "zucchini");
+  assert.equal(foodRule("SPAR Kichererbsen", "g").food, "chickpeas", "not peas");
+  assert.equal(foodRule("SPAR Knoblauch", "g").food, "garlic", "not leek");
+  assert.equal(foodRule("SPAR Süßkartoffeln", "g").food, "sweet_potato", "not potato");
+});
+
 test("SPAR CSV rows become rows like the other stores", () => {
   const { rows } = sparCsv.convert(csv(
     "2026-11-23,8999,1,S-BUDGET Kartoffeln,2 KG,2.99,false,false,1.5,kg",
