@@ -1,7 +1,7 @@
 {
   "source": "https://heisse-preise.io/data/latest-canonical.json",
   "license": "MIT (badlogic/heissepreise) for the heisse-preise data and parsing",
-  "generatedAt": "2026-11-23T21:28:07.105Z",
+  "generatedAt": "2026-11-24T14:40:16.233Z",
   "columns": [
     "id",
     "name",
@@ -12,21 +12,22 @@
     "weighted",
     "category"
   ],
-  "total": 6960,
+  "total": 6962,
   "bySupermarket": {
-    "SPAR": 965,
-    "BILLA": 5995
+    "BILLA": 5997,
+    "SPAR": 965
   },
   "stores": {
+    "BILLA": {
+      "count": 5997,
+      "updatedAt": "2026-11-24T14:40:16.233Z",
+      "source": "https://heisse-preise.io/data/latest-canonical.json"
+    },
     "SPAR": {
       "count": 965,
       "updatedAt": "2026-11-23T21:28:07.105Z",
-      "source": "SPAR price export precios-spar-2026-11-23.csv"
-    },
-    "BILLA": {
-      "count": 5995,
-      "updatedAt": "2026-11-23T14:13:32.320Z",
-      "source": "https://heisse-preise.io/data/latest-canonical.json"
+      "source": "SPAR price export precios-spar-2026-11-23.csv",
+      "stale": true
     }
   }
 }
